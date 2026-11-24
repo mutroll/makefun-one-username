@@ -24,7 +24,8 @@ def main() -> int:
 
     # Write with a restrictive umask first, then open the file
     # world-readable: make.fun collects outputs as another user, so
-    # the file must be mode 0644 and its folder 0755.
+    # the file must be mode 0644; its folder is set to 0755 only on a
+    # best-effort basis below, since the sandbox may own it already.
     old_umask = os.umask(0o022)
     try:
         path = os.path.join(output_dir, "entry.txt")
@@ -34,7 +35,14 @@ def main() -> int:
         os.umask(old_umask)
 
     os.chmod(path, 0o644)
-    os.chmod(output_dir, 0o755)
+    # Best effort only: in the grader sandbox the output directory is
+    # pre-created and owned by another user, so chmod'ing it raises
+    # PermissionError there. The directory's mode is the sandbox's own
+    # business — never let this fail the run.
+    try:
+        os.chmod(output_dir, 0o755)
+    except (PermissionError, OSError):
+        pass
 
     # Read the file back and refuse to exit cleanly unless it holds
     # exactly the handle — no extra bytes, no trailing newline, no
